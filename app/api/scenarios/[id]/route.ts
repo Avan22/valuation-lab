@@ -1,36 +1,53 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+// Prisma needs Node runtime (NOT Edge)
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
-  const item = await prisma.scenario.findUnique({ where: { id: params.id } });
-  if (!item) return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+type Ctx = { params: { id: string } };
+
+export async function GET(_req: Request, { params }: Ctx) {
+  const item = await prisma.scenario.findUnique({
+    where: { id: params.id },
+  });
+
+  if (!item) {
+    return NextResponse.json(
+      { ok: false, error: "Not found" },
+      { status: 404 }
+    );
+  }
+
   return NextResponse.json({ ok: true, item });
 }
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, { params }: Ctx) {
   try {
     const body = await req.json();
-    const { name, currency, inputs } = body || {};
+    const { name, currency, inputs } = body ?? {};
 
     const item = await prisma.scenario.update({
       where: { id: params.id },
       data: {
-        ...(name ? { name: String(name) } : {}),
-        ...(currency ? { currency: String(currency) } : {}),
-        ...(inputs ? { inputs } : {}),
+        ...(name !== undefined ? { name: String(name) } : {}),
+        ...(currency !== undefined ? { currency: String(currency) } : {}),
+        ...(inputs !== undefined ? { inputs } : {}),
       },
     });
 
     return NextResponse.json({ ok: true, item });
   } catch {
-    return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "Bad request" },
+      { status: 400 }
+    );
   }
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
-  await prisma.scenario.delete({ where: { id: params.id } });
+export async function DELETE(_req: Request, { params }: Ctx) {
+  await prisma.scenario.delete({
+    where: { id: params.id },
+  });
+
   return NextResponse.json({ ok: true });
 }
