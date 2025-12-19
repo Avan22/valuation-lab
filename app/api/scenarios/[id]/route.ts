@@ -1,53 +1,55 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// Prisma needs Node runtime (NOT Edge)
-export const runtime = "nodejs";
+type Params = { id: string };
 
-type Ctx = { params: { id: string } };
+export async function GET(_req: NextRequest, ctx: { params: Promise<Params> }) {
+  const { id } = await ctx.params;
 
-export async function GET(_req: Request, { params }: Ctx) {
-  const item = await prisma.scenario.findUnique({
-    where: { id: params.id },
-  });
+  try {
+    const item = await prisma.scenario.findUnique({ where: { id } });
 
-  if (!item) {
-    return NextResponse.json(
-      { ok: false, error: "Not found" },
-      { status: 404 }
-    );
+    if (!item) {
+      return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ ok: true, item });
+  } catch {
+    return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
   }
-
-  return NextResponse.json({ ok: true, item });
 }
 
-export async function PUT(req: Request, { params }: Ctx) {
+export async function PUT(req: NextRequest, ctx: { params: Promise<Params> }) {
+  const { id } = await ctx.params;
+
   try {
-    const body = await req.json();
-    const { name, currency, inputs } = body ?? {};
+    const body = await req.json().catch(() => ({}));
+
+    const data: any = {};
+    if (body?.name !== undefined) data.name = String(body.name);
+    if (body?.kind !== undefined) data.kind = String(body.kind);
+    if (body?.currency !== undefined) data.currency = String(body.currency);
+    if (body?.inputs !== undefined) data.inputs = body.inputs;
 
     const item = await prisma.scenario.update({
-      where: { id: params.id },
-      data: {
-        ...(name !== undefined ? { name: String(name) } : {}),
-        ...(currency !== undefined ? { currency: String(currency) } : {}),
-        ...(inputs !== undefined ? { inputs } : {}),
-      },
+      where: { id },
+      data,
     });
 
     return NextResponse.json({ ok: true, item });
   } catch {
-    return NextResponse.json(
-      { ok: false, error: "Bad request" },
-      { status: 400 }
-    );
+    // Prisma throws if record doesn't exist
+    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 }
 
-export async function DELETE(_req: Request, { params }: Ctx) {
-  await prisma.scenario.delete({
-    where: { id: params.id },
-  });
+export async function DELETE(_req: NextRequest, ctx: { params: Promise<Params> }) {
+  const { id } = await ctx.params;
 
-  return NextResponse.json({ ok: true });
+  try {
+    await prisma.scenario.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+  }
 }
